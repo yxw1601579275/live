@@ -17,7 +17,6 @@ jobs:
 
       - name: Download and Stream
         run: |
-          # 1. 下载 1GB 视频
           wget -c -O video.mp4 "https://objectstorageapi.ap-southeast-1.clawcloudrun.com/szi722v0-mine/video.mp4"
           
           if [ ! -s video.mp4 ]; then
@@ -25,9 +24,8 @@ jobs:
             exit 1
           fi
 
-          echo "开始流畅版推流..."
-          # 2. 核心修复：强制转码为 2500k 码率，解决 4500k 导致的卡顿
-          # 增加 -reconnect 参数应对网络抖动
+          echo "开始流畅版推流${{ secrets.YOUTUBE_RTMP }}..."
+         
           timeout 5.5h bash -c '
             while true; do
               ffmpeg -re -i video.mp4 \
