@@ -1,0 +1,7 @@
+- name: Start Streaming
+    run: |
+      # 1. 先从外部链接下载视频 (替换成你自己的视频直链)
+      wget -C "https://objectstorageapi.ap-southeast-1.clawcloudrun.com/szi722v0-mine/video.mp4"
+      
+      # 2. 推流 (单文件循环模式)
+      timeout 5.5h ffmpeg -re -stream_loop -1 -i my_video.mp4 -vcodec copy -acodec copy -f flv "${{ secrets.BILI_RTMP }}"
