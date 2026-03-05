@@ -18,9 +18,9 @@ jobs:
       - name: Download and Stream
         run: |
           # 1. 下载 1GB 视频
-          wget -c -O video2.mp4 "https://objectstorageapi.ap-southeast-1.clawcloudrun.com/szi722v0-mine/video2.mp4"
+          wget -c -O video.mp4 "https://objectstorageapi.ap-southeast-1.clawcloudrun.com/szi722v0-mine/video.mp4"
           
-          if [ ! -s video2.mp4 ]; then
+          if [ ! -s video.mp4 ]; then
             echo "下载失败！"
             exit 1
           fi
@@ -30,7 +30,7 @@ jobs:
           # 增加 -reconnect 参数应对网络抖动
           timeout 5.5h bash -c '
             while true; do
-              ffmpeg -re -i video2.mp4 \
+              ffmpeg -re -i video.mp4 \
                 -c:v libx264 -preset veryfast -b:v 2500k -maxrate 2500k -bufsize 5000k \
                 -g 60 -c:a aac -b:a 128k -ar 44100 \
                 -flvflags no_duration_filesize \
