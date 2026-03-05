@@ -1,4 +1,4 @@
-name: Bilibili 24H Live
+name: 24H Live
 
 on:
   schedule:
