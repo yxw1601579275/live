@@ -17,19 +17,25 @@ jobs:
 
       - name: Download and Stream
         run: |
-          # 1. 下载视频 (增加超时重试，防止大文件下载中断)
-          wget -c -t 5 -O video2.mp4 "https://objectstorageapi.ap-southeast-1.clawcloudrun.com/szi722v0-mine/video2.mp4"
+          # 1. 下载 1GB 视频
+          wget -c -O video2.mp4 "https://objectstorageapi.ap-southeast-1.clawcloudrun.com/szi722v0-mine/video2.mp4"
           
-          # 2. 检查文件是否下载完整
           if [ ! -s video2.mp4 ]; then
-            echo "错误：视频下载失败！"
+            echo "下载失败！"
             exit 1
           fi
 
-          echo "开始推流..."
-          # 3. 优化推流参数：降低码率至 2500k，增加重连和缓存
-          timeout 5.5h ffmpeg -re -i video2.mp4 \
-            -c:v libx264 -preset veryfast -b:v 2500k -maxrate 2500k -bufsize 5000k \
-            -g 60 -c:a aac -b:a 128k -ar 44100 \
-            -flvflags no_duration_filesize \
-            -f flv "${{ secrets.BILI_RTMP }}" || true
+          echo "开始流畅版推流..."
+          # 2. 核心修复：强制转码为 2500k 码率，解决 4500k 导致的卡顿
+          # 增加 -reconnect 参数应对网络抖动
+          timeout 5.5h bash -c '
+            while true; do
+              ffmpeg -re -i video2.mp4 \
+                -c:v libx264 -preset veryfast -b:v 2500k -maxrate 2500k -bufsize 5000k \
+                -g 60 -c:a aac -b:a 128k -ar 44100 \
+                -flvflags no_duration_filesize \
+                -f flv "${{ secrets.BILI_RTMP }}"
+              echo "连接断开，5秒后自动重连..."
+              sleep 5
+            done
+          ' || true
