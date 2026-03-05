@@ -34,7 +34,7 @@ jobs:
                 -c:v libx264 -preset veryfast -b:v 2500k -maxrate 2500k -bufsize 5000k \
                 -g 60 -c:a aac -b:a 128k -ar 44100 \
                 -flvflags no_duration_filesize \
-                -f flv "${{ secrets.BILI_RTMP }}"
+                -f flv "${{ secrets.YOUTUBE_RTMP }}"
               echo "连接断开，5秒后自动重连..."
               sleep 5
             done
