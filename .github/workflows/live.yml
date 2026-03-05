@@ -1,7 +1,31 @@
-- name: Start Streaming
-    run: |
-      # 1. 先从外部链接下载视频 (替换成你自己的视频直链)
-      wget -C "https://objectstorageapi.ap-southeast-1.clawcloudrun.com/szi722v0-mine/video.mp4"
-      
-      # 2. 推流 (单文件循环模式)
-      timeout 5.5h ffmpeg -re -stream_loop -1 -i my_video.mp4 -vcodec copy -acodec copy -f flv "${{ secrets.BILI_RTMP }}"
+name: Bilibili 24H Live
+
+on:
+  schedule:
+    - cron: '0 */5 * * *'
+  workflow_dispatch:
+
+jobs:
+  push-live:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Download and Stream
+        run: |
+          echo "正在从外部链接下载视频..."
+          # 请将下方引号内的地址替换为你的真实直链
+          wget -c "https://objectstorageapi.ap-southeast-1.clawcloudrun.com/szi722v0-mine/video.mp4"
+          
+          # 检查下载的文件是否有效
+          if [ ! -s video.mp4 ]; then
+            echo "错误：下载失败或文件为空！"
+            exit 1
+          fi
+
+          echo "开始推流..."
+          timeout 5.5h ffmpeg -re -stream_loop -1 -i video.mp4 -c:v copy -c:a copy -f flv "${{ secrets.BILI_RTMP }}" || true
