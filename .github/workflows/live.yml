@@ -1,9 +1,9 @@
-name: 24H Live
+name: YouTube 24H Live (Dynamic Bitrate)
 
 on:
   schedule:
-    - cron: '0 */5 * * *'
-  workflow_dispatch:
+    - cron: '0 */5 * * *' # 每5小时自动重启一次
+  workflow_dispatch:      # 支持手动点击启动
 
 jobs:
   push-live:
@@ -12,28 +12,38 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install FFmpeg and Fonts
+        run: |
+          sudo apt-get update
+          # 安装字体以支持 drawtext 滤镜
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
 
       - name: Download and Stream
         run: |
+          # 从外部链接下载视频
           wget -c -O video.mp4 "https://objectstorageapi.ap-southeast-1.clawcloudrun.com/szi722v0-mine/video.mp4"
           
           if [ ! -s video.mp4 ]; then
-            echo "下载失败！"
+            echo "错误：视频下载失败！"
             exit 1
           fi
 
-          echo "开始流畅版推流${{ secrets.YOUTUBE_RTMP }}..."
+          echo "开始推流（不锁码率，带时间水印）..."
          
+          # timeout 确保在 GitHub 6小时限制前主动结束并由下一次 cron 接管
           timeout 5.5h bash -c '
             while true; do
+              # 关键修改：去掉 -b:v 等码率限制参数
+              # 使用 -c:v libx264 但不指定码率，FFmpeg 会根据 crf(默认23) 自动调整
+              # -vf 滤镜在右上角绘制实时时间
               ffmpeg -re -i video.mp4 \
-                -c:v libx264 -preset veryfast -b:v 2500k -maxrate 2500k -bufsize 5000k \
+                -vf "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='\''%{localtime\:%H\\\\\:%M\\\\\:%S}'\'':x=w-220:y=30:fontsize=26:fontcolor=white:shadowcolor=black:shadowx=2" \
+                -c:v libx264 -preset veryfast \
                 -g 60 -c:a aac -b:a 128k -ar 44100 \
                 -flvflags no_duration_filesize \
                 -f flv "${{ secrets.YOUTUBE_RTMP }}"
-              echo "连接断开，5秒后自动重连..."
+              
+              echo "推流意外断开，5秒后自动重连..."
               sleep 5
             done
           ' || true
