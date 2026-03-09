@@ -1,9 +1,9 @@
-name: YouTube 24H Live (Cache & Clean Log)
+name: 24H Stable Live (CST Time & Smooth)
 
 on:
   schedule:
-    - cron: '0 */5 * * *' # 每5小时自动重启一次
-  workflow_dispatch:      # 支持手动随时启动
+    - cron: '0 */5 * * *' # 每5小时重启
+  workflow_dispatch:      # 手动启动
 
 jobs:
   push-live:
@@ -12,48 +12,46 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 【优化】检查并读取 1GB 视频缓存，避免每次 wget 耗时
       - name: Cache Video File
         id: cache-video
         uses: actions/cache@v3
         with:
           path: video.mp4
-          key: youtube-video-v1 # 如果更换视频，请修改此版本号
+          key: video-v1
 
       - name: Install FFmpeg and Fonts
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-dejavu-core
 
-      # 【优化】只有在缓存未命中时才执行下载
       - name: Download Video (Only if not cached)
         if: steps.cache-video.outputs.cache-hit != 'true'
         run: |
-          echo "缓存未命中，正在执行首次下载..."
           wget -c -O video.mp4 "https://objectstorageapi.ap-southeast-1.clawcloudrun.com/szi722v0-mine/video.mp4"
 
-      - name: Stream with Clean Logs
+      - name: Stream with Beijing Time
         run: |
-          echo "视频准备就绪，开始推流至 YouTube..."
-          # 后台运行心跳进程，每 5 分钟打印一次日志，防止页面冗余
-          (while true; do echo "--- [$(date +'%H:%M:%S')] YouTube 推流运行中 ---"; sleep 300; done) &
+          echo "修正北京时区并开启流畅推流..."
+          (while true; do echo "--- [$(date +'%H:%M:%S')] 正在推流中 ---"; sleep 300; done) &
           
-          # timeout 确保在 GitHub 6小时限制前主动结束
+          # 核心修正：设置 TZ 环境变量为亚洲/上海（北京时间）
+          export TZ="Asia/Shanghai"
+          
           timeout 5.5h bash -c '
             while true; do
-              # 核心配置：动态时间水印 + 不锁码率 + 深度元数据伪装
-              # 使用 -loglevel error 保持日志清爽
+              # 1. 限制帧率为 30fps (-r 30) 防止回放“飞快”
+              # 2. 强制 3000k 码率防止网络拥塞导致卡顿
+              # 3. 动态噪点 (noise) 继续保留对抗 AI
               ffmpeg -re -i video.mp4 \
-                -vf "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='\''%{localtime\:%H\\\\\:%M\\\\\:%S}'\'':x=w-220:y=30:fontsize=26:fontcolor=white:shadowcolor=black:shadowx=2" \
-                -c:v libx264 -preset veryfast \
-                -g 60 -c:a aac -b:a 128k -ar 44100 \
-                -map_metadata -1 \
-                -metadata service_provider="OBS" \
-                -metadata encoder="OBS x264 encoder" \
+                -r 30 \
+                -vf "noise=alls=3:allf=t,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='\''%{localtime\:%H\\\\\:%M\\\\\:%S}'\'':x=w-220:y=30:fontsize=26:fontcolor=white:shadowcolor=black:shadowx=2" \
+                -c:v libx264 -preset veryfast -b:v 3000k -maxrate 3000k -bufsize 6000k \
+                -pix_fmt yuv420p -g 60 -c:a aac -b:a 128k -ar 44100 \
+                -map_metadata -1 -metadata service_provider="OBS" \
                 -loglevel error \
-                -f flv "${{ secrets.YOUTUBE_RTMP }}" 
+                -f flv "${{ secrets.BILI_RTMP }}" 
           
-              echo "检测到 YouTube 连接断开，5秒后自动重连..."
+              echo "连接断开，5秒后重连..."
               sleep 5
             done
           ' || true
